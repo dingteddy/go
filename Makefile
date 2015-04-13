@@ -22,7 +22,6 @@ SUBDIRS := $(dirs)
 
 all:subdirs
 	$(MKDIR) -p $(BIN_DIR)
-	go build *.go
 
 subdirs: $(SUBDIRS)
 
