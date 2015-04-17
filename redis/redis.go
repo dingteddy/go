@@ -1,28 +1,80 @@
 package main
 
 import (
+	"flag"
 	"fmt"
+	"math/rand"
 	"redis"
 	"time"
 )
 
-func main() {
-	conn, err := redis.DialTimeout("tcp", ":6379", 0, 1*time.Second, 1*time.Second)
-	if err != nil {
-		panic(err)
+func newPool(server, password string) *redis.Pool {
+	return &redis.Pool{
+		MaxIdle:     3,
+		IdleTimeout: 240 * time.Second,
+		Dial: func() (redis.Conn, error) {
+			c, err := redis.Dial("tcp", server)
+			if err != nil {
+				return nil, err
+			}
+			/*if _, err := c.Do("AUTH", password); err != nil {
+				c.Close()
+				return nil, err
+			}*/
+			return c, err
+		},
+		TestOnBorrow: func(c redis.Conn, t time.Time) error {
+			_, err := c.Do("PING")
+			return err
+		},
 	}
-	size, err := conn.Do("DBSIZE")
-	fmt.Printf("size is %d \n", size)
+}
 
-	_, err = conn.Do("SET", "user:user0", 123)
-	_, err = conn.Do("SET", "user:user1", 456)
-	_, err = conn.Do("APPEND", "user:user0", 87)
+var (
+	pool  *redis.Pool
+	rhost = flag.String("rhost", ":6379", "")
+	rpass = flag.String("rpass", "", "")
+)
 
-	user0, err := redis.Int(conn.Do("GET", "user:user0"))
-	user1, err := redis.Int(conn.Do("GET", "user:user1"))
+func main() {
+	flag.Parse()
+	pool = newPool(*rhost, *rpass)
+	if pool == nil {
+		fmt.Println("haha\n")
+	}
+	//conn, err := redis.DialTimeout("tcp", ":6379", 0, 1*time.Second, 1*time.Second)
+	//if err != nil {
+	//	panic(err)
+	//}
+	for i := 0; i < 5; i++ {
+		go func() {
+			conn := pool.Get()
+			if conn == nil {
+				fmt.Printf("aiai")
+			}
+			//fmt.Println(conn)
+			for i := 0; i < 9; i++ {
+				r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	fmt.Printf("user0 is %d , user1 is %d \n", user0, user1)
-	fmt.Printf("hehe\n")
+				key := fmt.Sprintf("user:user%d", i)
+				_, err := conn.Do("SET", key, 123)
+				_, err = conn.Do("APPEND", key, 87)
+				if err != nil {
+					fmt.Printf("operation failed!\n")
+				}
 
-	conn.Close()
+				user, err := redis.Int(conn.Do("GET", key))
+				conn.Do("DEL", key)
+
+				randnum := r.Intn(1000)
+				fmt.Printf("user%d is %d, rand is %d, key is %s\n", i, user, randnum, key)
+				time.Sleep(time.Millisecond * time.Duration(randnum))
+			}
+			conn.Close()
+		}()
+	}
+	for {
+		time.Sleep(1)
+	}
+	pool.Close()
 }

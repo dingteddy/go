@@ -4,17 +4,18 @@ import (
 	"fmt"
 	"net"
 	"os"
+	//"test"
 	"time"
 )
 
 const (
-	MAX_CONN_NUM = 5
+	MAX_CONN_NUM = 50000
 )
 
 //echo server Goroutine
 func EchoFunc(conn net.Conn) {
 	defer conn.Close()
-	buf := make([]byte, 1024)
+	buf := make([]byte, 10)
 	for {
 		_, err := conn.Read(buf)
 		if err != nil {
@@ -22,6 +23,7 @@ func EchoFunc(conn net.Conn) {
 			return
 		}
 		//send reply
+		//fmt.Println(buf)
 		_, err = conn.Write(buf)
 		if err != nil {
 			//println("Error send reply:", err.Error())
@@ -39,6 +41,8 @@ func main() {
 	}
 	defer listener.Close()
 
+	//test.Test()
+	//test.Test2()
 	fmt.Printf("running ...\n")
 
 	var cur_conn_num int = 0
